@@ -1,86 +1,142 @@
-# gitar-frekans
+# 🎸 Gitar Frekans & Tuner
 
-\# Gitar Frekans \& Tuner Projesi
+Python ile geliştirilmiş basit bir gitar frekans hesaplama ve gerçek zamanlı akort projesi.
 
+## 📁 Proje Dosyaları
 
+### `gitar.py`
 
-Elektro gitar telleri için frekans hesaplama ve gerçek zamanlı akort (tuner) uygulaması. Python ile geliştirildi, ses analizi için FFT ve YIN algoritması kullanır.
+Gitarın belirli bir telindeki ve perdesindeki notanın:
 
+* Nota adını
+* Teorik frekansını (Hz)
 
+hesaplar.
 
-\## İçerik
+Program tel numarası ve perde numarasını kullanıcıdan alır.
 
+Örneğin:
 
+```text
+Tel numarası (1-6): 6
+Perde numarası (0-24): 0
 
-\- \*\*gitar.py\*\* — Tel ve perde numarasına göre teorik frekans ve nota ismini hesaplar
+Nota: E2
+Frekans: 82.41 Hz
+```
 
-\- \*\*tuner.py\*\* — Mikrofon/ses arayüzünden gerçek zamanlı ses alıp, en yakın gitar teline göre akort durumunu gösterir
+### `tuner.py`
 
+Mikrofondan veya bağlı bir ses kartından gelen gitar sinyalini gerçek zamanlı olarak analiz eder.
 
+Program başlatıldığında mevcut ses giriş cihazlarını listeler:
 
-\## Gereksinimler
+```text
+Mevcut ses giriş cihazları:
 
+  1: Mikrofon (...)
+  2: M-Track (...)
+```
 
+Kullanıcı kullanmak istediği cihazın numarasını seçtikten sonra tuner çalışmaya başlar.
 
-\- Python 3.10+
+Program:
 
-\- Bir ses girişi (dahili mikrofon veya harici ses arayüzü, örn. M-Audio M-Track)
+1. Gitar sesini kaydeder.
+2. Ses sinyalinin temel frekansını YIN algoritmasıyla tahmin eder.
+3. Frekansı en yakın standart gitar teliyle karşılaştırır.
+4. Telin akort durumunu gösterir.
 
+Örnek çıktı:
 
+```text
+E (kalın, 6. tel) | 82.35 Hz | ✓ Akortlu!
+```
 
-\## Kurulum
+veya:
 
+```text
+A (5. tel)        | 112.40 Hz | Çok tiz, 2.40 Hz gevşet
+```
 
+## ⚙️ Gereksinimler
+
+* Python 3.10+
+* NumPy
+* SoundDevice
+* Mikrofon veya ses kartı
+* Gitar
+
+Bağımlılıkları yüklemek için:
 
 ```bash
-
 pip install -r requirements.txt
-
 ```
 
+## ▶️ Kullanım
 
-
-\## Kullanım
-
-
-
-\*\*Teorik frekans/nota hesaplama:\*\*
+### Frekans hesaplama
 
 ```bash
-
 py gitar.py
-
 ```
 
-Tel numarası (1-6) ve perde numarası (0-24) girildiğinde, o notanın frekansını ve ismini (örn. "E4") gösterir.
+Ardından tel ve perde numarasını girin.
 
-
-
-\*\*Gerçek zamanlı tuner:\*\*
+### Gerçek zamanlı tuner
 
 ```bash
-
 py tuner.py
-
 ```
 
-Sürekli dinleme moduna geçer, gitar teline çaldıkça anlık frekans ve akort durumunu ("akortlu", "gevşet", "sıkıştır") gösterir. Durdurmak için `Ctrl+C`.
+Program mevcut ses giriş cihazlarını listeleyecektir.
 
+Kullanmak istediğiniz cihazın numarasını girin. Daha sonra tuner sürekli olarak gitar sinyalini analiz etmeye başlayacaktır.
 
+Programı durdurmak için:
 
-\## Bilinen Sınırlamalar
+```text
+Ctrl + C
+```
 
+kullanabilirsiniz.
 
+## 🧠 Nasıl Çalışıyor?
 
-\- Ses arayüzü kodda ismiyle ("M-Track") aranıyor; farklı bir cihaz kullanıyorsan `tuner.py` içindeki cihaz arama satırını kendi cihaz isminle güncellemen gerekir.
+### Frekans hesaplama
 
-\- Gürültülü elektriksel ortamlarda (uğultu/hum) yanlış okuma yapabilir; temiz bir sinyal kaynağı (düşük gain, kaliteli kablo) önerilir.
+Gitar tellerinin standart akort frekansları kullanılarak perde frekansı hesaplanır:
 
+```text
+f = f₀ × 2^(n/12)
+```
 
+Burada:
 
-\## Nasıl Çalışır
+* `f₀` = açık telin frekansı
+* `n` = perde numarası
+* `f` = elde edilen frekans
 
+### Tuner
 
+`tuner.py`, ses sinyalinden temel frekansı tahmin etmek için **YIN algoritması** kullanır.
 
-Frekans tespiti için \*\*YIN algoritması\*\* kullanılır — sinyali kendisiyle farklı zaman kaymalarında karşılaştırıp, periyodikliğin en güçlü olduğu noktayı (temel frekansı) bulur. Bu yöntem, basit otokorelasyona göre yanlış oktav/harmonik kilitlenmelerine karşı daha dayanıklıdır.
+Tahmin edilen frekans daha sonra standart gitar tellerinin frekanslarıyla karşılaştırılır.
 
+## 🎯 Projenin Amacı
+
+Bu proje, gitar akordunun arkasındaki:
+
+* frekans
+* nota
+* ses sinyali
+* temel frekans tespiti
+
+gibi kavramları Python kullanarak pratik şekilde incelemek amacıyla geliştirilmiştir.
+
+## ⚠️ Sınırlamalar
+
+* Gürültülü ortamlarda frekans tespiti daha az doğru olabilir.
+* Çok düşük seviyeli ses sinyalleri algılanmayabilir.
+* Tuner, standart gitar akordundaki telleri temel alır.
+* Kullanılan ses giriş cihazının sürücüsü ve ayarları sonuçları etkileyebilir.
