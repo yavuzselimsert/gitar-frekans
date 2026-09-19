@@ -15,6 +15,8 @@ def en_yakin_tel(frekans):
     en_yakin = min(gitar_telleri.items(), key=lambda x: abs(x[1] - frekans))
     return en_yakin
 
+def cents_hesapla(frekans, hedef_frekans):
+    return 1200 * np.log2(frekans / hedef_frekans)
 
 def frekans_bul(ses_verisi, ornekleme_hizi):
     ses_verisi = ses_verisi.astype(np.float64)
@@ -134,6 +136,8 @@ else:
             else:
                 tel_adi, hedef_frekans = en_yakin_tel(frekans)
                 fark = frekans - hedef_frekans
+                cents = cents_hesapla(frekans, hedef_frekans)
+                
 
                 if abs(fark) < 1:
                     durum = "✓ Akortlu!          "
@@ -153,6 +157,7 @@ else:
                 print(
                     f"{tel_adi:20s} | "
                     f"{frekans:6.2f} Hz | "
+                    f"{cents:+6.1f} cents | "
                     f"{durum}",
                     end="\r"
                 )
