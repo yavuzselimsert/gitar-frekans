@@ -138,5 +138,5 @@ gibi kavramları Python kullanarak pratik şekilde incelemek amacıyla geliştir
 
 * Gürültülü ortamlarda frekans tespiti daha az doğru olabilir.
 * Çok düşük seviyeli ses sinyalleri algılanmayabilir.
-* Tuner, standart gitar akordundaki telleri temel alır.
+* Tuner, standart gitar akordundaki telleri (EADGBE) temel alır.
 * Kullanılan ses giriş cihazının sürücüsü ve ayarları sonuçları etkileyebilir.
