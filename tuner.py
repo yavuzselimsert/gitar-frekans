@@ -21,7 +21,7 @@ DURATION = 0.5
 MAX_SIGNAL_LOSS = 4
 
 
-def yin_frekans_tespit(signal, sample_rate):
+def detect_pitch_yin(signal, sample_rate):
     """
     Estimate the fundamental frequency using the YIN algorithm.
     """
@@ -63,14 +63,18 @@ def yin_frekans_tespit(signal, sample_rate):
     # YIN threshold
     threshold = 0.15
 
+    # Restrict search to the guitar frequency range (60-400 Hz)
+    min_tau = int(sample_rate / 400)
+    max_tau_search = min(int(sample_rate / 60), max_tau - 1)
+
     candidates = np.where(
-        cmndf[2:] < threshold
+        cmndf[min_tau:max_tau_search] < threshold
     )[0]
 
     if len(candidates) == 0:
         return None
 
-    tau = candidates[0] + 2
+    tau = candidates[0] + min_tau
 
     # Parabolic interpolation for improved accuracy
     if 1 < tau < max_tau - 1:
@@ -268,7 +272,7 @@ def main():
             sd.wait()
 
             # Estimate fundamental frequency
-            frequency = yin_frekans_tespit(
+            frequency = detect_pitch_yin(
                 audio,
                 SAMPLE_RATE
             )
