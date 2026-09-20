@@ -1,142 +1,182 @@
-# 🎸 Gitar Frekans & Tuner
+# Guitar Tuner
 
-Python ile geliştirilmiş basit bir gitar frekans hesaplama ve gerçek zamanlı akort projesi.
+A real-time guitar tuner built in Python using digital signal processing techniques.
 
-## 📁 Proje Dosyaları
+The project analyzes live audio from a microphone or audio interface, estimates the fundamental frequency of a guitar note using the **YIN algorithm**, and calculates the pitch deviation in **cents** to provide real-time tuning feedback.
+
+> A small DSP project exploring the intersection of music, signal processing, and software.
+
+## Features
+
+* 🎸 Real-time guitar pitch detection
+* 🎯 Automatic detection of the nearest standard-tuning string
+* 📊 Pitch deviation displayed in cents
+* 📟 Terminal-based tuner interface
+* 🎙️ Support for microphones and external audio interfaces
+* 🔌 Configurable audio input device
+* 🧮 Theoretical guitar frequency and note calculator
+
+## Demo
+
+The tuner runs directly in the terminal and provides real-time pitch feedback.
+
+## How It Works
+
+The tuner processes incoming audio in short blocks and estimates the fundamental frequency of the guitar signal using the **YIN pitch detection algorithm**.
+
+The detected frequency is then compared with the target frequency of the nearest guitar string.
+
+Pitch deviation is calculated in cents using:
+
+```text
+cents = 1200 × log₂(f / f₀)
+```
+
+where:
+
+* `f` is the detected frequency
+* `f₀` is the target frequency
+
+A deviation of:
+
+* `0 cents` → perfectly in tune
+* `-100 cents` → one semitone flat
+* `+100 cents` → one semitone sharp
+
+## Standard Tuning
+
+| String | Note | Frequency |
+| ------ | ---- | --------: |
+| 6th    | E2   |  82.41 Hz |
+| 5th    | A2   | 110.00 Hz |
+| 4th    | D3   | 146.83 Hz |
+| 3rd    | G3   | 196.00 Hz |
+| 2nd    | B3   | 246.94 Hz |
+| 1st    | E4   | 329.63 Hz |
+
+## Project Structure
+
+```text
+gitar-frekans/
+├── gitar.py
+├── tuner.py
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
 
 ### `gitar.py`
 
-Gitarın belirli bir telindeki ve perdesindeki notanın:
-
-* Nota adını
-* Teorik frekansını (Hz)
-
-hesaplar.
-
-Program tel numarası ve perde numarasını kullanıcıdan alır.
-
-Örneğin:
-
-```text
-Tel numarası (1-6): 6
-Perde numarası (0-24): 0
-
-Nota: E2
-Frekans: 82.41 Hz
-```
+Calculates the theoretical frequency and note name for a given guitar string and fret.
 
 ### `tuner.py`
 
-Mikrofondan veya bağlı bir ses kartından gelen gitar sinyalini gerçek zamanlı olarak analiz eder.
+Captures live audio, estimates the fundamental frequency using YIN, identifies the nearest guitar string, and displays the tuning deviation.
 
-Program başlatıldığında mevcut ses giriş cihazlarını listeler:
+## Installation
 
-```text
-Mevcut ses giriş cihazları:
-
-  1: Mikrofon (...)
-  2: M-Track (...)
-```
-
-Kullanıcı kullanmak istediği cihazın numarasını seçtikten sonra tuner çalışmaya başlar.
-
-Program:
-
-1. Gitar sesini kaydeder.
-2. Ses sinyalinin temel frekansını YIN algoritmasıyla tahmin eder.
-3. Frekansı en yakın standart gitar teliyle karşılaştırır.
-4. Telin akort durumunu gösterir.
-
-Örnek çıktı:
-
-```text
-E (kalın, 6. tel) | 82.35 Hz | ✓ Akortlu!
-```
-
-veya:
-
-```text
-A (5. tel)        | 112.40 Hz | Çok tiz, 2.40 Hz gevşet
-```
-
-## ⚙️ Gereksinimler
+### Requirements
 
 * Python 3.10+
-* NumPy
-* SoundDevice
-* Mikrofon veya ses kartı
-* Gitar
+* A microphone or audio interface
+* Electric guitar
 
-Bağımlılıkları yüklemek için:
+Clone the repository:
+
+```bash
+git clone https://github.com/yavuzselimsert/gitar-frekans.git
+cd gitar-frekans
+```
+
+Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## ▶️ Kullanım
+## Usage
 
-### Frekans hesaplama
+### Frequency Calculator
 
-```bash
-py gitar.py
-```
-
-Ardından tel ve perde numarasını girin.
-
-### Gerçek zamanlı tuner
+Run:
 
 ```bash
-py tuner.py
+python gitar.py
 ```
 
-Program mevcut ses giriş cihazlarını listeleyecektir.
+Enter a string number (`1–6`) and fret number (`0–24`) to calculate the corresponding note and theoretical frequency.
 
-Kullanmak istediğiniz cihazın numarasını girin. Daha sonra tuner sürekli olarak gitar sinyalini analiz etmeye başlayacaktır.
+### Real-Time Tuner
 
-Programı durdurmak için:
+Run:
 
-```text
-Ctrl + C
+```bash
+python tuner.py
 ```
 
-kullanabilirsiniz.
+The program will list available audio input devices. Select the input connected to your guitar or audio interface.
 
-## 🧠 Nasıl Çalışıyor?
+The tuner will then continuously analyze the incoming signal.
 
-### Frekans hesaplama
+Press `Ctrl+C` to exit.
 
-Gitar tellerinin standart akort frekansları kullanılarak perde frekansı hesaplanır:
+## Technical Details
 
-```text
-f = f₀ × 2^(n/12)
-```
+### YIN Pitch Detection
 
-Burada:
+The tuner uses the YIN algorithm for fundamental frequency estimation.
 
-* `f₀` = açık telin frekansı
-* `n` = perde numarası
-* `f` = elde edilen frekans
+The implementation includes:
 
-### Tuner
+1. Difference function
+2. Cumulative Mean Normalized Difference Function (CMNDF)
+3. Threshold-based period selection
+4. Parabolic interpolation for improved frequency estimation
 
-`tuner.py`, ses sinyalinden temel frekansı tahmin etmek için **YIN algoritması** kullanır.
+This approach allows the tuner to estimate the fundamental frequency directly from the time-domain audio signal.
 
-Tahmin edilen frekans daha sonra standart gitar tellerinin frekanslarıyla karşılaştırılır.
+### Cents Calculation
 
-## 🎯 Projenin Amacı
+The difference between the detected frequency and the target frequency is expressed in cents, a logarithmic unit commonly used to describe musical pitch intervals.
 
-Bu proje, gitar akordunun arkasındaki:
+This makes it possible to provide a continuous tuning indicator rather than simply reporting whether a note is correct or incorrect.
 
-* frekans
-* nota
-* ses sinyali
-* temel frekans tespiti
+## Limitations
 
-gibi kavramları Python kullanarak pratik şekilde incelemek amacıyla geliştirilmiştir.
+The current implementation is intentionally lightweight and has several limitations:
 
-## ⚠️ Sınırlamalar
+* Background noise can affect pitch detection.
+* Very weak input signals may not produce a reliable frequency estimate.
+* Audio interface and driver configuration can affect detection quality.
+* The tuner currently assumes standard guitar tuning.
+* Pitch detection can become less reliable with complex or heavily distorted signals.
 
-* Gürültülü ortamlarda frekans tespiti daha az doğru olabilir.
-* Çok düşük seviyeli ses sinyalleri algılanmayabilir.
-* Tuner, standart gitar akordundaki telleri (EADGBE) temel alır.
-* Kullanılan ses giriş cihazının sürücüsü ve ayarları sonuçları etkileyebilir.
+## Potential Improvements
+
+* Frequency smoothing and stability filtering
+* Improved octave and harmonic rejection
+* Pitch detection confidence estimation
+* Automated tests using known reference frequencies
+* Support for alternate tunings
+* Graphical user interface
+* Real-time guitar effects and DSP experiments
+* C++/JUCE implementation for lower-latency processing
+* Embedded implementation on a microcontroller
+
+## Technologies
+
+* **Python**
+* **NumPy**
+* **SoundDevice**
+* **Digital Signal Processing**
+* **YIN Pitch Detection**
+
+## Motivation
+
+This project started as a way to combine two of my interests: **electrical engineering and electric guitar**.
+
+It serves as a practical introduction to audio signal processing, frequency estimation, and real-time systems while providing a useful tool for tuning an electric guitar.
+
+---
+
+**Author:** [Yavuz Selim Sert](https://github.com/yavuzselimsert)
