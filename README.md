@@ -1,5 +1,7 @@
 # Guitar Tuner
 
+![CI](https://github.com/yavuzselimsert/gitar-frekans/actions/workflows/ci.yml/badge.svg)
+
 A real-time guitar tuner built in Python using digital signal processing techniques.
 
 The project analyzes live audio from a microphone or audio interface, estimates the fundamental frequency of a guitar note using the **YIN algorithm**, and calculates the pitch deviation in **cents** to provide real-time tuning feedback.
