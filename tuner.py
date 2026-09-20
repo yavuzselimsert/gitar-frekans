@@ -1,166 +1,337 @@
 import numpy as np
 import sounddevice as sd
 
-gitar_telleri = {
-    "E (kalın, 6. tel)": 82.41,
-    "A (5. tel)": 110.00,
-    "D (4. tel)": 146.83,
-    "G (3. tel)": 196.00,
-    "B (2. tel)": 246.94,
-    "E (ince, 1. tel)": 329.63
+
+# Standard guitar tuning frequencies
+STRINGS = {
+    "E (Low, 6th string)": 82.41,
+    "A (5th string)": 110.00,
+    "D (4th string)": 146.83,
+    "G (3rd string)": 196.00,
+    "B (2nd string)": 246.94,
+    "E (High, 1st string)": 329.63,
 }
 
 
-def en_yakin_tel(frekans):
-    en_yakin = min(gitar_telleri.items(), key=lambda x: abs(x[1] - frekans))
-    return en_yakin
+SAMPLE_RATE = 44100
+DURATION = 0.5
 
-def cents_hesapla(frekans, hedef_frekans):
-    return 1200 * np.log2(frekans / hedef_frekans)
+# Number of consecutive failed detections before
+# the tuner considers the signal to be lost.
+MAX_SIGNAL_LOSS = 4
 
-def frekans_bul(ses_verisi, ornekleme_hizi):
-    ses_verisi = ses_verisi.astype(np.float64)
-    genlik_ortalama = np.abs(ses_verisi).mean()
 
-    if genlik_ortalama < 0.002:
-        return 0
+def yin_frekans_tespit(signal, sample_rate):
+    """
+    Estimate the fundamental frequency using the YIN algorithm.
+    """
 
-    ses_verisi = ses_verisi - np.mean(ses_verisi)
+    signal = signal.flatten()
 
-    min_tau = int(ornekleme_hizi / 400)
-    max_tau = int(ornekleme_hizi / 60)
+    # Remove DC offset
+    signal = signal - np.mean(signal)
 
-    fark = np.zeros(max_tau)
+    # Ignore very weak signals
+    if np.max(np.abs(signal)) < 0.01:
+        return None
+
+    max_tau = min(len(signal) // 2, 2000)
+
+    # Difference function
+    difference = np.zeros(max_tau)
 
     for tau in range(1, max_tau):
-        fark[tau] = np.sum(
-            (ses_verisi[:-tau] - ses_verisi[tau:]) ** 2
+        difference[tau] = np.sum(
+            (signal[:-tau] - signal[tau:]) ** 2
         )
 
+    # Cumulative Mean Normalized Difference Function
     cmndf = np.ones(max_tau)
-    toplam = 0.0
+
+    running_sum = 0.0
 
     for tau in range(1, max_tau):
-        toplam += fark[tau]
-        cmndf[tau] = fark[tau] / (toplam / tau) if toplam > 0 else 1
+        running_sum += difference[tau]
 
-    esik = 0.15
-    tau_tahmini = -1
+        if running_sum == 0:
+            cmndf[tau] = 1
+        else:
+            cmndf[tau] = (
+                difference[tau] * tau / running_sum
+            )
 
-    for tau in range(min_tau, max_tau):
-        if cmndf[tau] < esik:
-            tau_tahmini = tau
+    # YIN threshold
+    threshold = 0.15
 
-            while (
-                tau_tahmini + 1 < max_tau
-                and cmndf[tau_tahmini + 1] < cmndf[tau_tahmini]
-            ):
-                tau_tahmini += 1
+    candidates = np.where(
+        cmndf[2:] < threshold
+    )[0]
 
-            break
+    if len(candidates) == 0:
+        return None
 
-    if tau_tahmini == -1:
-        return 0
+    tau = candidates[0] + 2
 
-    if 0 < tau_tahmini < max_tau - 1:
-        y0 = cmndf[tau_tahmini - 1]
-        y1 = cmndf[tau_tahmini]
-        y2 = cmndf[tau_tahmini + 1]
+    # Parabolic interpolation for improved accuracy
+    if 1 < tau < max_tau - 1:
+        y1 = cmndf[tau - 1]
+        y2 = cmndf[tau]
+        y3 = cmndf[tau + 1]
 
-        payda = y0 - 2 * y1 + y2
+        denominator = 2 * (2 * y2 - y1 - y3)
 
-        if payda != 0:
-            tau_tahmini += 0.5 * (y0 - y2) / payda
+        if denominator != 0:
+            tau = tau + (y3 - y1) / denominator
 
-    return ornekleme_hizi / tau_tahmini
+    if tau <= 0:
+        return None
+
+    frequency = sample_rate / tau
+
+    return frequency
 
 
-# Kullanıcıya mevcut ses giriş cihazlarını göster
-print("Mevcut ses giriş cihazları:\n")
+def find_nearest_string(frequency):
+    """
+    Find the guitar string closest to the detected frequency.
+    """
 
-cihazlar = sd.query_devices()
-giris_cihazlari = []
-
-for i, cihaz in enumerate(cihazlar):
-    if cihaz['max_input_channels'] > 0:
-        giris_cihazlari.append(i)
-        print(
-            f"  {i}: {cihaz['name']} "
-            f"({cihaz['max_input_channels']} kanal)"
+    string_name = min(
+        STRINGS,
+        key=lambda string: abs(
+            STRINGS[string] - frequency
         )
-
-print()
-
-secim = input("Kullanmak istediğin cihazın numarasını gir: ")
-hedef_index = int(secim)
-
-if hedef_index not in giris_cihazlari:
-    print("Geçersiz cihaz numarası!")
-
-else:
-    ornekleme_hizi = 44100
-    pencere_suresi = 0.5
-
-    print(
-        "Sürekli dinleme başladı. "
-        "Durdurmak için Ctrl+C bas.\n"
     )
 
+    target_frequency = STRINGS[string_name]
+
+    return string_name, target_frequency
+
+
+def calculate_cents(frequency, target_frequency):
+    """
+    Calculate the pitch deviation in cents.
+    """
+
+    return 1200 * np.log2(
+        frequency / target_frequency
+    )
+
+
+def get_tuning_status(cents):
+    """
+    Determine the tuning status from the cents deviation.
+    """
+
+    if abs(cents) <= 5:
+        return "IN TUNE"
+
+    if cents < -50:
+        return "TOO FLAT"
+
+    if cents < 0:
+        return "FLAT"
+
+    if cents > 50:
+        return "TOO SHARP"
+
+    return "SHARP"
+
+
+def display_tuner(
+    string_name,
+    frequency,
+    target_frequency,
+    cents
+):
+    """
+    Display the tuner interface in the terminal.
+    """
+
+    status = get_tuning_status(cents)
+
+    width = 48
+    gauge_width = 31
+
+    # Limit the gauge to ±50 cents
+    clamped_cents = max(-50, min(50, cents))
+
+    gauge_position = int(
+        (clamped_cents + 50)
+        / 100
+        * (gauge_width - 1)
+    )
+
+    gauge = ["-"] * gauge_width
+
+    # Center marker
+    gauge[gauge_width // 2] = "|"
+
+    # Needle
+    gauge[gauge_position] = "O"
+
+    gauge = "".join(gauge)
+
+    def line(text=""):
+        print(
+            "|" +
+            text.center(width) +
+            "|"
+        )
+
+    # Clear terminal
+    print("\033[2J\033[H", end="")
+
+    print("+" + "-" * width + "+")
+    line("GUITAR TUNER")
+    print("+" + "-" * width + "+")
+
+    line()
+
+    line(f"String: {string_name}")
+    line(f"Frequency: {frequency:.2f} Hz")
+    line(f"Target: {target_frequency:.2f} Hz")
+    line(f"Deviation: {cents:+.1f} cents")
+
+    line()
+
+    line("FLAT")
+    line("<" + gauge + ">")
+    line("SHARP")
+
+    line()
+
+    line(status)
+
+    line()
+
+    print("+" + "-" * width + "+")
+    print()
+    print("Ctrl+C to exit")
+
+
+def list_input_devices():
+    """
+    Display available audio input devices.
+    """
+
+    devices = sd.query_devices()
+
+    print("\nAvailable audio input devices:\n")
+
+    input_devices = []
+
+    for device_index, device in enumerate(devices):
+
+        if device["max_input_channels"] > 0:
+
+            print(
+                f"  {len(input_devices) + 1}: "
+                f"{device['name']}"
+            )
+
+            input_devices.append(device_index)
+
+    return input_devices
+
+
+def main():
+    input_devices = list_input_devices()
+
+    device_number = int(
+        input("\nSelect input device number: ")
+    )
+
+    # Convert the displayed number to the
+    # actual sounddevice device index.
+    device_index = input_devices[device_number - 1]
+
+    print("\nStarting tuner...")
+    print("Press Ctrl+C to exit.\n")
+
+    last_valid_measurement = None
+    signal_loss_count = 0
+
     try:
+
         while True:
-            kanal_sayisi = cihazlar[hedef_index]['max_input_channels']
 
-            # En fazla 2 kanal kullan
-            kullanilacak_kanal = min(kanal_sayisi, 2)
-
-            kayit = sd.rec(
-                int(pencere_suresi * ornekleme_hizi),
-                samplerate=ornekleme_hizi,
-                channels=kullanilacak_kanal,
-                device=hedef_index
+            # Record audio
+            audio = sd.rec(
+                int(DURATION * SAMPLE_RATE),
+                samplerate=SAMPLE_RATE,
+                channels=1,
+                dtype="float32",
+                device=device_index
             )
 
             sd.wait()
 
-            # Son kanalı al
-            kayit = kayit[:, kullanilacak_kanal - 1]
-
-            frekans = frekans_bul(
-                kayit,
-                ornekleme_hizi
+            # Estimate fundamental frequency
+            frequency = yin_frekans_tespit(
+                audio,
+                SAMPLE_RATE
             )
 
-            if frekans == 0:
-                print("...", end="\r")
+            # ---------------------------------
+            # NO VALID SIGNAL
+            # ---------------------------------
 
-            else:
-                tel_adi, hedef_frekans = en_yakin_tel(frekans)
-                fark = frekans - hedef_frekans
-                cents = cents_hesapla(frekans, hedef_frekans)
-                
+            if frequency is None:
 
-                if abs(fark) < 1:
-                    durum = "✓ Akortlu!          "
+                signal_loss_count += 1
 
-                elif fark > 0:
-                    durum = (
-                        f"Çok tiz, "
-                        f"{abs(fark):5.2f} Hz gevşet   "
-                    )
+                # Keep displaying the last valid
+                # measurement for short signal gaps.
+                if (
+                    last_valid_measurement is not None
+                    and signal_loss_count < MAX_SIGNAL_LOSS
+                ):
+                    continue
 
-                else:
-                    durum = (
-                        f"Çok pes, "
-                        f"{abs(fark):5.2f} Hz sıkıştır "
-                    )
+                # If there has been no valid
+                # measurement yet, simply wait.
+                if last_valid_measurement is None:
+                    continue
 
-                print(
-                    f"{tel_adi:20s} | "
-                    f"{frekans:6.2f} Hz | "
-                    f"{cents:+6.1f} cents | "
-                    f"{durum}",
-                    end="\r"
-                )
+                # Keep the previous tuner display.
+                # The interface should not jump
+                # back and forth when the signal
+                # briefly disappears.
+                continue
+
+            # ---------------------------------
+            # VALID SIGNAL
+            # ---------------------------------
+
+            signal_loss_count = 0
+
+            string_name, target_frequency = (
+                find_nearest_string(frequency)
+            )
+
+            cents = calculate_cents(
+                frequency,
+                target_frequency
+            )
+
+            last_valid_measurement = (
+                string_name,
+                frequency,
+                target_frequency,
+                cents
+            )
+
+            display_tuner(
+                string_name,
+                frequency,
+                target_frequency,
+                cents
+            )
 
     except KeyboardInterrupt:
-        print("\n\nDinleme durduruldu.")
+        print("\n\nTuner stopped.")
+
+
+if __name__ == "__main__":
+    main()
